@@ -78,15 +78,15 @@ def generate_banner(title: str, category: str | None = None,
     # ── フォントサイズを文字数で自動調整 ────────────────────────────────────
     title_len = len(title)
     if title_len <= 14:
-        title_size = 72
+        title_size = 96
     elif title_len <= 20:
-        title_size = 62
+        title_size = 82
     elif title_len <= 28:
-        title_size = 54
+        title_size = 70
     elif title_len <= 36:
-        title_size = 46
+        title_size = 62
     else:
-        title_size = 40
+        title_size = 54
 
     f_title = ImageFont.truetype(FONT_JP, title_size)
 

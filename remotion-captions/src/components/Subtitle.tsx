@@ -97,7 +97,7 @@ export const HookBlock: React.FC<HookBlockProps> = ({ lines }) => {
     <div
       style={{
         position: "absolute",
-        top: height * 0.27,
+        top: height * 0.35,
         left: 0,
         right: 0,
         display: "flex",

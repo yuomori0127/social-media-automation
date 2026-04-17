@@ -51,7 +51,7 @@ export const CAPTIONS: Caption[] = [
     confidence: 1,
   },
   {
-    text: "という<b>論文</b>がある。",
+    text: "という<b>研究</b>がある。",
     startMs: 12330,
     endMs: 13740,
     timestampMs: 12330,

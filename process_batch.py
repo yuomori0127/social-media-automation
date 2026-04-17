@@ -231,9 +231,15 @@ def main():
         print(f"\n{'='*50}")
         print(f"Processing row {row}: {f_val[:50]}...")
 
-        # 1. Generate banner
+        # 1. Generate banner (title from I列 first # heading, fallback to F列)
+        banner_title = f_val
+        for line in i_val.splitlines():
+            line = line.strip()
+            if line.startswith("# "):
+                banner_title = line.lstrip("# ").strip()
+                break
         print(f"  Generating banner...")
-        ok, banner_path = generate_banner(row, f_val)
+        ok, banner_path = generate_banner(row, banner_title)
         if ok:
             banner_success += 1
         else:

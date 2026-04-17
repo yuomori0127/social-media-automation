@@ -16,6 +16,8 @@ transcribe_words.py → script_align.py を順番に実行する。
 Usage:
     python scripts/run_all.py
 """
+import json
+import os
 import shutil
 import subprocess
 import sys
@@ -68,6 +70,62 @@ def backup_previous_run() -> Path | None:
     return session_dir
 
 
+def generate_keywords() -> None:
+    """script.txt を読んで OpenAI でキーワードを自動生成し keywords.txt に保存する。"""
+    script_path = SCRIPTS_DIR / "script.txt"
+    keywords_path = SCRIPTS_DIR / "keywords.txt"
+
+    if not script_path.exists():
+        print("  script.txt が見つかりません。スキップします。")
+        return
+
+    # .env から OPENAI_API_KEY を読む
+    env_path = PROJECT_ROOT / ".env"
+    if env_path.exists():
+        for line in env_path.read_text(encoding="utf-8").splitlines():
+            line = line.strip()
+            if "=" in line and not line.startswith("#"):
+                k, v = line.split("=", 1)
+                os.environ[k.strip()] = v.strip()
+
+    api_key = os.environ.get("OPENAI_API_KEY", "")
+    if not api_key:
+        print("  OPENAI_API_KEY が見つかりません。keywords.txt の自動生成をスキップします。")
+        return
+
+    try:
+        import openai
+        client = openai.OpenAI(api_key=api_key)
+        script_text = script_path.read_text(encoding="utf-8").strip()
+
+        resp = client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[
+                {
+                    "role": "system",
+                    "content": (
+                        "以下のYouTube Shorts用字幕スクリプトから、視聴者の目を引くために"
+                        "黄色くハイライトすべきキーワードを5〜10個抽出してください。"
+                        "数字・専門用語・感情的なフレーズを優先してください。"
+                        "1行に1キーワードだけ、キーワードのみを返してください。説明不要。"
+                    ),
+                },
+                {"role": "user", "content": script_text},
+            ],
+            temperature=0.3,
+        )
+        keywords = [
+            line.strip()
+            for line in resp.choices[0].message.content.splitlines()
+            if line.strip()
+        ]
+        keywords_path.write_text("\n".join(keywords) + "\n", encoding="utf-8")
+        print(f"  keywords.txt を自動生成しました（{len(keywords)}件）: {', '.join(keywords)}")
+    except Exception as e:
+        print(f"  キーワード自動生成に失敗しました（{e}）。keywords.txt なしで続行します。")
+        keywords_path.unlink(missing_ok=True)
+
+
 def run_script(script_name: str) -> None:
     script_path = SCRIPTS_DIR / script_name
     print(f"\n{'='*50}")
@@ -89,6 +147,11 @@ def main():
     session_dir = backup_previous_run()
 
     run_script("transcribe_words.py")
+
+    print(f"\n{'='*50}")
+    print("【Step 1.5】キーワード自動生成中...")
+    generate_keywords()
+
     run_script("script_align.py")
 
     print(f"\n{'='*50}")

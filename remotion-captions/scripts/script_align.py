@@ -21,13 +21,39 @@ SCRIPTS_DIR = PROJECT_ROOT / "scripts"
 if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 
+# Shorts幅（1080px × 0.86）÷ 日本語1文字幅（80px × 0.92）≒ 12.6
+MAX_CHARS_PER_LINE = 13
+
+def wrap_lines(lines: list[str]) -> list[str]:
+    """長い行を MAX_CHARS_PER_LINE 以内に分割する。句読点の直後で優先的に区切る。"""
+    result = []
+    for line in lines:
+        if len(line) <= MAX_CHARS_PER_LINE:
+            result.append(line)
+            continue
+        BREAK_AFTER = set("。、！？…")
+        current = ""
+        for ch in line:
+            current += ch
+            if len(current) >= MAX_CHARS_PER_LINE:
+                result.append(current)
+                current = ""
+            elif ch in BREAK_AFTER and len(current) >= 5:
+                result.append(current)
+                current = ""
+        if current:
+            result.append(current)
+    return result
+
+
 # --- 台本読み込み ---
 script_path = SCRIPTS_DIR / "script.txt"
 if not script_path.exists():
     print(f"Error: {script_path} が見つかりません", file=sys.stderr)
     sys.exit(1)
-SCRIPT_LINES = [l for l in script_path.read_text(encoding="utf-8").splitlines() if l.strip()]
-print(f"台本を読み込みました（{len(SCRIPT_LINES)}行）")
+_raw_lines = [l for l in script_path.read_text(encoding="utf-8").splitlines() if l.strip()]
+SCRIPT_LINES = wrap_lines(_raw_lines)
+print(f"台本を読み込みました（{len(_raw_lines)}行 → 折り返し後 {len(SCRIPT_LINES)}行）")
 
 # --- キーワード読み込み（任意） ---
 keywords_path = SCRIPTS_DIR / "keywords.txt"

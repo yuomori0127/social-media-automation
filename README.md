@@ -2,29 +2,17 @@
 
 1歳児を持つ親向けに、育児の悩みをPubMed論文のエビデンスで解決するコンテンツを自動生成し、X（Twitter）とnoteに発信するワークフロー。
 
-```
-PubMed論文
-    ↓
-OpenAI API でコンテンツ生成
-    ↓
-Googleスプレッドシートに書き込み
-    ↓
-テロップ付き動画（remotion-captions）
-```
-
 ---
 
-## 生成物一覧
+## 全体の流れ
 
-| 生成物 | 仕様 |
-|---|---|
-| X長文ポスト | 600〜900字・1投稿（Xプレミアム向け） |
-| noteタイトル＋見出し構成 | 4〜7セクション |
-| note全文 | 1500字以上・Markdown形式 |
-| noteバナー画像 | 1280×670px |
-| YouTube Shortsスクリプト | 60〜180秒・Hook/本文/CTA形式 |
-| Higgsfieldビジュアルプロンプト | シーン別3〜5個・英語 |
-| テロップ付き動画 | MP4・Whisper自動タイミング |
+```
+① /run コマンドでコンテンツ生成
+   PubMed論文 → X投稿 / note / Shortsスクリプト → Googleスプレッドシートに書き込み
+
+② テロップ動画を作る（remotion-captions）
+   video.mp4 + script.txt を置いて run_all.py を実行 → テロップ付きMP4を書き出し
+```
 
 ---
 
@@ -34,7 +22,7 @@ Googleスプレッドシートに書き込み
 
 - Node.js 18以上
 - Python 3.9以上
-- ffmpeg（`transcribe_words.py` で使用）
+- ffmpeg
 - OpenAI APIキー
 - Google Cloud OAuthクライアント（Sheets / Drive スコープ）
 
@@ -45,19 +33,16 @@ git clone https://github.com/yuomori0127/social-media-automation.git
 cd social-media-automation
 npm install
 
-# テロップ動画サブプロジェクト
 cd remotion-captions && npm install && cd ..
 ```
 
-### 環境変数の設定
+### 環境変数
 
 `.env.example` をコピーして `.env` を作成する。
 
 ```bash
 cp .env.example .env
 ```
-
-`.env` を編集：
 
 ```
 OPENAI_API_KEY=sk-proj-...
@@ -66,7 +51,7 @@ GOOGLE_CLIENT_SECRET=...
 SPREADSHEET_ID=...
 ```
 
-`remotion-captions/.env` にも同じ `OPENAI_API_KEY` が必要（Whisper APIで使用）。
+`remotion-captions/.env` にも同じ `OPENAI_API_KEY` が必要（Whisper・キーワード生成で使用）。
 
 ### Google認証
 
@@ -74,11 +59,15 @@ SPREADSHEET_ID=...
 node google_auth.mjs
 ```
 
-ブラウザが開くのでGoogleアカウントでログインする。`token.json` が生成されれば完了。
+ブラウザが開くのでGoogleアカウントでログインする。`token.json` が生成されれば完了。トークンが期限切れになったら再実行する。
 
 ---
 
-## スプレッドシート構造
+## ① コンテンツ生成（X / note / Shorts）
+
+Claude Code で `/run` コマンドを実行するだけで、論文検索からスプレッドシート書き込みまで全自動で行われる。
+
+### スプレッドシート構造
 
 | 列 | 内容 |
 |---|---|
@@ -88,31 +77,15 @@ node google_auth.mjs
 | D | 一次要約（英語アブストラクト） |
 | E | ステータス（未処理 / 処理済） |
 | F | noteタイトル |
-| G | X長文ポスト |
+| G | X長文ポスト（600〜900字・1投稿） |
 | H | noteタイトル＋見出し構成 |
-| I | note全文 |
+| I | note全文（1500字以上・Markdown） |
 | J | noteバナー画像パス |
-| K | YouTube Shortsスクリプト |
-| L | Higgsfieldビジュアルプロンプト |
-| M | YouTubeステータス |
+| K | YouTube Shortsスクリプト（60〜180秒） |
+| L | Higgsfieldビジュアルプロンプト（英語） |
+| M | YouTubeステータス（未投稿 / 編集中 / 投稿済） |
 
----
-
-## コンテンツ生成
-
-### 主要スクリプト
-
-| スクリプト | 役割 |
-|---|---|
-| `process_pending.mjs` | 未処理行を取得してコンテンツ生成・書き込みまで一括実行 |
-| `run_theme_search.mjs` | テーマ指定でPubMed論文を検索してスプレッドシートに追加 |
-| `generate_banner.py` | noteバナー画像を生成（1280×670px） |
-| `process_batch.py` | バッチ処理（複数行まとめて処理） |
-| `google_auth.mjs` | Google OAuth2認証・`token.json` 生成 |
-| `read_sheets.mjs` | スプレッドシート読み込み |
-| `write_sheets.mjs` | スプレッドシート書き込み |
-
-### バナー生成
+### バナー画像を単体で作りたいとき
 
 ```bash
 python generate_banner.py --title "タイトル" --output "./images/banners/YYYYMMDD_rowXX.png"
@@ -120,99 +93,68 @@ python generate_banner.py --title "タイトル" --output "./images/banners/YYYY
 
 ---
 
-## テロップ付き動画（remotion-captions）
+## ② テロップ付き動画（remotion-captions）
 
-動画ファイルと台本テキストを用意するだけで、Whisper APIがタイミングを自動計算し、テロップ付きMP4を書き出す。AfterEffectsやPremiere Proは不要。
+動画と台本を置いて1コマンドを実行するだけで、Whisperが自動でタイミングを計算しテロップ付きMP4を書き出す。
 
-### 仕組み
-
-```
-public/video.mp4  +  scripts/script.txt
-        ↓
-① transcribe_words.py
-   ffmpegで音声抽出 → Whisper APIで単語レベルのタイムスタンプ取得
-   → scripts/whisper_words_raw.json
-        ↓
-② script_align.py
-   台本テキストとWhisperの単語列を照合 → 各行の開始・終了秒を計算
-   → src/data/captions.ts（自動生成）
-        ↓
-③ Remotion Studio でプレビュー / render でMP4書き出し
-```
-
-Remotionは「ReactコードでHTMLを動画に変換する」フレームワーク。テロップのデザインとアニメーションをコードで1回定義すれば、台本を差し替えるだけで毎回同じクオリティの動画が自動生成される。
-
-### 使い方（動画1本ごとの手順）
+### 手順
 
 #### Step 1：素材を用意する
+
+以下の2ファイルだけ用意すれば OK。他は自動生成される。
 
 | ファイル | 内容 |
 |---|---|
 | `remotion-captions/public/video.mp4` | テロップを乗せたい動画（上書きコピー） |
-| `remotion-captions/scripts/script.txt` | 台本テキスト（1行 = テロップ1枚） |
-| `remotion-captions/scripts/keywords.txt` | 黄色ハイライトするキーワード（1行 = 1語、省略可） |
+| `remotion-captions/scripts/script.txt` | 台本テキスト |
 
-`script.txt` の書き方：
+**script.txt の書き方：**
+- 1行 = テロップ1枚として表示される
+- 改行位置は適当で OK。13文字を超える行は自動的に折り返される
+- 句読点（。、！？）の直後で優先的に区切られる
+
 ```
-冒頭のキャッチコピーをここに書く
-2枚目のテロップをここに書く
-3枚目のテロップをここに書く
-詳しくはnoteで。フォローで続報も届けます。
+慣らし保育で泣いてる子を見て、自分も辛くなってた。
+でも調べたら、これ愛着形成に必要なプロセスだったんです。
+論文によると分離不安のピークは8〜18ヶ月。
+より詳しい情報はnoteやXで。フォローお願いします。
 ```
 
-#### Step 2：文字起こし＋タイムスタンプ生成（一括実行）
+**keywords.txt は不要。** スクリプトがOpenAI APIでハイライトキーワードを自動生成する。
+
+#### Step 2：一括実行
 
 ```bash
 cd remotion-captions
 python scripts/run_all.py
 ```
 
-実行前に前回の成果物を `sessions/YYYYMMDD_HHMMSS/` へ自動バックアップしてから、以下を順番に実行する。
+実行されること：
 
-1. `transcribe_words.py` — ffmpegで音声抽出 → Whisper APIで単語レベルのタイムスタンプ取得
-2. `script_align.py` — 台本と照合して `src/data/captions.ts` を生成
+| ステップ | 処理 |
+|---|---|
+| Step 0 | 前回の成果物を `sessions/YYYYMMDD_HHMMSS/` に自動バックアップ |
+| Step 1 | ffmpegで音声抽出 → Whisper APIで単語レベルのタイムスタンプ取得 |
+| Step 1.5 | script.txt からキーワードをAI自動生成 → `keywords.txt` に保存 |
+| Step 2 | 台本とWhisperを照合 → `src/data/captions.ts` を生成 |
 
-Remotion Studioが起動中であればブラウザが自動更新される。
-
-> 個別実行したい場合は `python scripts/transcribe_words.py` / `python scripts/script_align.py` を直接呼ぶ。
-
-**バックアップの保存先**
-
-```
-remotion-captions/sessions/
-└── 20260417_143022/          ← 実行日時
-    ├── video.mp4             ← 素材動画
-    ├── audio.wav             ← 抽出済み音声
-    ├── script.txt            ← 台本
-    ├── keywords.txt          ← ハイライトキーワード
-    ├── whisper_words_raw.json ← Whisper生データ
-    ├── captions.ts           ← 生成済みキャプション
-    └── output/               ← レンダリング済みMP4（あれば）
-```
-
-過去のセッションのファイルをそのまま `public/`・`scripts/`・`src/data/` に戻せば、その回の状態を再現できる。
-
-#### Step 4：プレビューで確認
+#### Step 3：プレビューで確認
 
 ```bash
 npx remotion studio
 ```
 
-ブラウザで http://localhost:3000/CaptionVideo を開く。ファイルを編集すると**ホットリロード**で即反映される。
+ブラウザで `http://localhost:3000/CaptionVideo` を開く。`captions.ts` を編集するとホットリロードで即反映される。
 
-#### Step 5：MP4を書き出す
+#### Step 4：MP4を書き出す
 
 ```bash
 npx remotion render CaptionVideo output/video_with_captions.mp4
 ```
 
----
+### タイミングの手動調整
 
-### テロップのカスタマイズ
-
-#### タイミングの手動調整
-
-`src/data/captions.ts` の `startMs` / `endMs`（ミリ秒）を直接編集する。Studio を開いたままファイルを保存するとリアルタイムで反映される。
+`src/data/captions.ts` の `startMs` / `endMs`（ミリ秒）を直接編集する。
 
 ```ts
 {
@@ -222,56 +164,71 @@ npx remotion render CaptionVideo output/video_with_captions.mp4
 },
 ```
 
-#### 文字色・フォントの変更
+### テロップのデザイン
 
 `src/components/Subtitle.tsx` で一元管理している。
 
-| 項目 | デフォルト値 |
+| 項目 | 設定値 |
 |---|---|
-| 通常テキスト色 | `#FFFFFF`（白） |
-| アウトライン色 | `#FF0000`（赤） |
-| `<b>`タグの色（キーワード） | `#FFFF00`（黄） |
+| テキスト色 | 白（`#FFFFFF`） |
+| アウトライン色 | 赤（`#FF0000`） |
+| キーワードハイライト色 | 黄（`#FFFF00`） |
 | フォント | Noto Sans JP・太さ900 |
-| 基本フォントサイズ | 68px（長い行は自動縮小、最小34px） |
-| テロップ位置 | 画面下部8% |
-| 出現アニメーション | フェードイン＋スライドアップ |
+| フォントサイズ | 80px（長い行は自動縮小、最小34px） |
+| テロップ位置 | 画面下部 |
+| 先頭2行 | 赤背景ボックスで中央表示（フック） |
 
-`captions.ts` 内で `<b>キーワード</b>` で囲むと黄色で強調表示される。
+### バックアップの内容
 
-#### ファイル構成
+```
+remotion-captions/sessions/
+└── 20260417_143022/
+    ├── video.mp4
+    ├── audio.wav
+    ├── script.txt
+    ├── keywords.txt
+    ├── whisper_words_raw.json
+    ├── captions.ts
+    └── output/
+```
+
+過去セッションのファイルを元の場所に戻せば、その回の状態を再現できる。
+
+### ファイル構成
 
 ```
 remotion-captions/
 ├── public/
-│   └── video.mp4               ← 動画をここに置く（毎回上書き）
+│   └── video.mp4               ← 毎回上書き
 ├── scripts/
-│   ├── script.txt              ← 台本（毎回書き換える）
-│   ├── keywords.txt            ← ハイライトキーワード（任意）
-│   ├── transcribe_words.py     ← Whisper実行スクリプト
-│   ├── script_align.py         ← アライメントスクリプト
+│   ├── script.txt              ← 毎回書き換える
+│   ├── keywords.txt            ← 自動生成
+│   ├── run_all.py              ← 一括実行スクリプト
+│   ├── transcribe_words.py     ← Whisper実行
+│   ├── script_align.py         ← タイムスタンプ合わせ
 │   ├── audio.wav               ← 自動生成
 │   └── whisper_words_raw.json  ← 自動生成
 ├── src/
-│   ├── Root.tsx                ← Remotionのコンポジション定義
-│   ├── CaptionVideo.tsx        ← 動画＋テロップの組み合わせ
-│   ├── data/captions.ts        ← 自動生成（タイムスタンプ）
-│   └── components/Subtitle.tsx ← テロップのデザイン定義
+│   ├── Root.tsx
+│   ├── CaptionVideo.tsx
+│   ├── data/captions.ts        ← 自動生成
+│   └── components/Subtitle.tsx ← テロップデザイン
 └── .env                        ← OPENAI_API_KEY
 ```
 
 ### トラブルシューティング
 
+**テロップのタイミングがずれている**  
+→ `captions.ts` を直接編集して `startMs` / `endMs` を手動調整する。
+
 **`insufficient_quota` エラーが出る**  
 → OpenAI APIの残高不足。https://platform.openai.com/billing でチャージする。
-
-**テロップのタイミングがずれている**  
-→ `script.txt` の1行が長すぎる場合は2行に分割すると精度が上がる。`captions.ts` を直接編集して手動調整も可能。
 
 **Remotion Studioが起動しない**  
 → `npm install` を再実行する。
 
-**`zod` のバージョン警告が出る**  
-→ 動作に影響しないため無視してよい。
+**`invalid_grant` / `Token expired` エラーが出る**  
+→ `node google_auth.mjs` を実行してトークンを再取得する。
 
 ---
 
