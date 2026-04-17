@@ -13,7 +13,7 @@ PROJECT_ROOT = Path(__file__).parent
 OUT_DIR = PROJECT_ROOT / "out"
 OUT_DIR.mkdir(exist_ok=True)
 
-output = OUT_DIR / f"{datetime.now().strftime('%Y%m%d')}.mp4"
+output = OUT_DIR / f"{datetime.now().strftime('%Y%m%d_%H%M%S')}.mp4"
 
 print(f"レンダリング開始 → {output}")
 result = subprocess.run(
