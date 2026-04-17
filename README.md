@@ -123,9 +123,35 @@ YouTube Shorts用の字幕付き動画を生成するサブプロジェクト。
 
 ```bash
 cd remotion-captions
-npm run dev   # プレビュー
-npm run build # 動画書き出し
+npx remotion studio  # ブラウザでプレビュー（localhost:3000）
+npx remotion render CaptionVideo output/output.mp4  # MP4書き出し
 ```
+
+### 字幕タイミングの手動調整
+
+`src/data/captions.ts` の `startMs` / `endMs`（ミリ秒）を直接編集する。Studio を開いたままファイルを保存するとホットリロードで即反映される。
+
+```ts
+{
+  text: "テキスト",
+  startMs: 500,   // 0.5秒から表示開始
+  endMs: 5000,    // 5秒で非表示
+},
+```
+
+### 文字色・フォントの変更
+
+`src/components/Subtitle.tsx` で一元管理している。
+
+| 項目 | 変数／プロパティ | デフォルト値 |
+|---|---|---|
+| 通常テキスト色 | `color` (SubtitlePage) | `#FFFFFF`（白） |
+| アウトライン色 | `makeOutlineShadow` の第1引数 | `#FF0000`（赤） |
+| `<b>`タグの色 | `color` (renderTaggedText) | `#FFFF00`（黄） |
+| フォント | `fontFamily` | `Noto Sans JP` |
+| 基本フォントサイズ | `BASE_FONT_SIZE` | `68px` |
+
+`captions.ts` 内でキーワードを `<b>テキスト</b>` で囲むと黄色で強調表示される。
 
 ---
 
