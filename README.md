@@ -110,15 +110,18 @@ python generate_banner.py --title "タイトル" --output "./images/banners/YYYY
 
 **script.txt の書き方：**
 - 1行 = テロップ1枚として表示される
-- 改行位置は適当で OK。13文字を超える行は自動的に折り返される
-- 句読点（。、！？）の直後で優先的に区切られる
+- 改行は適当で OK。15〜22文字を目安にGPTが自動で分割する
+- 表示上の折り返し位置を自分で指定したい場合は `|` を使う
 
 ```
-慣らし保育で泣いてる子を見て、自分も辛くなってた。
-でも調べたら、これ愛着形成に必要なプロセスだったんです。
-論文によると分離不安のピークは8〜18ヶ月。
+離乳食、食べてくれない。
+そのがんばり方、逆効果かもって論文に書いてあった
+子どもの食の主体性が|育ちにくくなる可能性|があるって。
 より詳しい情報はnoteやXで。フォローお願いします。
 ```
+
+- `|` がある行 → その位置で改行（自動分割しない）
+- `|` がない行 → GPTが文節の切れ目で自動分割し、さらに13文字超の部分は句読点・助詞で折り返す
 
 **keywords.txt は不要。** スクリプトがOpenAI APIでハイライトキーワードを自動生成する。
 
@@ -134,10 +137,9 @@ python scripts/run_all.py
 | ステップ | 処理 |
 |---|---|
 | Step 0 | 前回の成果物を `sessions/YYYYMMDD_HHMMSS/` に自動バックアップ |
-| Step 0.5 | `input/video.mp4` → `public/`、`input/script.txt` → `scripts/` にコピー |
-| Step 1 | ffmpegで音声抽出 → Whisper APIで単語レベルのタイムスタンプ取得 |
-| Step 1.5 | script.txt からキーワードをAI自動生成 → `keywords.txt` に保存 |
-| Step 2 | 台本とWhisperを照合 → `src/data/captions.ts` を生成 |
+| Step 1 | `input/` から素材をコピー → GPTで字幕行に分割 → ffmpegで音声抽出 → Whisper APIでタイムスタンプ取得 |
+| Step 2 | script.txt からキーワードをAI自動生成 → `keywords.txt` に保存 |
+| Step 3 | 台本とWhisperを照合・折り返し処理 → `src/data/captions.ts` を生成 |
 
 #### Step 3：プレビューで確認
 
@@ -175,7 +177,7 @@ npx remotion render CaptionVideo output/video_with_captions.mp4
 | アウトライン色 | 赤（`#FF0000`） |
 | キーワードハイライト色 | 黄（`#FFFF00`） |
 | フォント | Noto Sans JP・太さ900 |
-| フォントサイズ | 80px（長い行は自動縮小、最小34px） |
+| フォントサイズ | 80px固定（長い行は2〜3行に折り返し） |
 | テロップ位置 | 画面下部 |
 | 先頭2行 | 赤背景ボックスで中央表示（フック） |
 

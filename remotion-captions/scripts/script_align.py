@@ -21,39 +21,13 @@ SCRIPTS_DIR = PROJECT_ROOT / "scripts"
 if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 
-# Shorts幅（1080px × 0.86）÷ 日本語1文字幅（80px × 0.92）≒ 12.6
-MAX_CHARS_PER_LINE = 13
-
-def wrap_lines(lines: list[str]) -> list[str]:
-    """長い行を MAX_CHARS_PER_LINE 以内に分割する。句読点の直後で優先的に区切る。"""
-    result = []
-    for line in lines:
-        if len(line) <= MAX_CHARS_PER_LINE:
-            result.append(line)
-            continue
-        BREAK_AFTER = set("。、！？…")
-        current = ""
-        for ch in line:
-            current += ch
-            if len(current) >= MAX_CHARS_PER_LINE:
-                result.append(current)
-                current = ""
-            elif ch in BREAK_AFTER and len(current) >= 5:
-                result.append(current)
-                current = ""
-        if current:
-            result.append(current)
-    return result
-
-
 # --- 台本読み込み ---
 script_path = SCRIPTS_DIR / "script.txt"
 if not script_path.exists():
     print(f"Error: {script_path} が見つかりません", file=sys.stderr)
     sys.exit(1)
-_raw_lines = [l for l in script_path.read_text(encoding="utf-8").splitlines() if l.strip()]
-SCRIPT_LINES = wrap_lines(_raw_lines)
-print(f"台本を読み込みました（{len(_raw_lines)}行 → 折り返し後 {len(SCRIPT_LINES)}行）")
+SCRIPT_LINES = [l for l in script_path.read_text(encoding="utf-8").splitlines() if l.strip()]
+print(f"台本を読み込みました（{len(SCRIPT_LINES)}行）")
 
 # --- キーワード読み込み（任意） ---
 keywords_path = SCRIPTS_DIR / "keywords.txt"
@@ -104,6 +78,46 @@ def build_whisper_char_stream(words: list) -> tuple:
 
 # 短い文字列は誤マッチが多いため、この長さ未満の検索は行わない
 MIN_MATCH_LEN = 6
+
+# 1行に収まる最大文字数（超えたら2行に分割）
+MAX_CHARS_PER_LINE = 13
+
+# 改行を挿入する優先順位の高い文字（この直後で切る）
+BREAK_AFTER = set("。、！？…」』）")
+# 助詞・助動詞（この直後で切る）
+BREAK_PARTICLES = {"は", "が", "を", "に", "で", "と", "も", "へ", "て", "し", "な"}
+
+
+def _find_break_pos(text: str) -> int:
+    """text の中央付近で最良の区切り位置（インデックス）を返す。"""
+    mid = len(text) // 2
+    best_pos, best_score = mid, 999
+
+    for priority, chars in [(0, BREAK_AFTER), (1, BREAK_PARTICLES)]:
+        for pos in range(max(1, mid - 6), min(len(text), mid + 7)):
+            if text[pos - 1] in chars:
+                score = abs(pos - mid)
+                if score < best_score:
+                    best_score = score
+                    best_pos = pos
+        if best_score < 999:
+            break
+
+    return best_pos
+
+
+def insert_line_break(text: str) -> str:
+    """MAX_CHARS_PER_LINE を超えるセグメントがなくなるまで \\n を挿入する。
+    プレーンテキストのみ対象（add_keyword_tags より前に呼ぶこと）。"""
+    segments = text.split("\n")
+    result = []
+    for seg in segments:
+        while len(seg) > MAX_CHARS_PER_LINE:
+            pos = _find_break_pos(seg)
+            result.append(seg[:pos])
+            seg = seg[pos:]
+        result.append(seg)
+    return "\n".join(result)
 
 
 def search_line(norm_line: str, whisper_str: str, whisper_chars: list, from_pos: int):
@@ -186,7 +200,12 @@ def main():
         end_time = line_start_times[i + 1] if i + 1 < len(line_start_times) else words[-1]["end"]
         start_ms = round(start_time * 1000)
         end_ms = round(end_time * 1000)
-        tagged_text = add_keyword_tags(line)
+        # | が含まれていれば手動指定の改行位置を使い、なければ自動分割
+        if "|" in line:
+            broken = line.replace("|", "\n")
+        else:
+            broken = insert_line_break(line)
+        tagged_text = add_keyword_tags(broken)
         captions.append({
             "text": tagged_text,
             "startMs": start_ms,

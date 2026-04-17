@@ -83,6 +83,75 @@ def copy_inputs() -> None:
         print(f"  コピー: {src.relative_to(PROJECT_ROOT)} → {dst.relative_to(PROJECT_ROOT)} ({size_mb:.1f}MB)")
 
 
+def load_openai_client():
+    """環境変数を読み込んで OpenAI クライアントを返す。キーがなければ None。"""
+    env_path = PROJECT_ROOT / ".env"
+    if env_path.exists():
+        for line in env_path.read_text(encoding="utf-8").splitlines():
+            line = line.strip()
+            if "=" in line and not line.startswith("#"):
+                k, v = line.split("=", 1)
+                os.environ[k.strip()] = v.strip()
+    api_key = os.environ.get("OPENAI_API_KEY", "")
+    if not api_key:
+        return None
+    import openai
+    return openai.OpenAI(api_key=api_key)
+
+
+def _merge_broken_katakana(lines: list[str]) -> list[str]:
+    """次の行が長音符「ー」で始まる場合のみ前行に結合する。"""
+    result = []
+    for line in lines:
+        if result and line.startswith('\u30FC'):  # ー（長音符）
+            result[-1] = result[-1] + line
+        else:
+            result.append(line)
+    return result
+
+
+def segment_script() -> None:
+    """input/script.txt をGPTで意味の切れ目に分割し scripts/script.txt に書き込む。"""
+    script_path = SCRIPTS_DIR / "script.txt"
+    if not script_path.exists():
+        print("  script.txt が見つかりません。スキップします。")
+        return
+
+    client = load_openai_client()
+    if client is None:
+        print("  OPENAI_API_KEY が見つかりません。セグメント分割をスキップします。")
+        return
+
+    raw = script_path.read_text(encoding="utf-8").strip()
+    try:
+        resp = client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[
+                {
+                    "role": "system",
+                    "content": (
+                        "YouTube Shorts用の字幕テキストを、画面に表示するテロップ単位に分割してください。\n"
+                        "ルール:\n"
+                        "- 1単位あたり15〜22文字を目安にする（2行で表示されることがある）\n"
+                        "- 必ず文節・意味の切れ目で区切る。複合語・カタカナ語の途中で切らない\n"
+                        "- 句点（。）や読点（、）の直後を優先的な区切り位置にする\n"
+                        "- 文字数より自然な切り目を優先する\n"
+                        "- 空行を入れない。1単位ずつ出力する\n"
+                        "- テキストの内容を一切変えない。分割のみ行う"
+                    ),
+                },
+                {"role": "user", "content": raw},
+            ],
+            temperature=0.2,
+        )
+        lines = [l for l in resp.choices[0].message.content.splitlines() if l.strip()]
+        lines = _merge_broken_katakana(lines)
+        script_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+        print(f"  script.txt を再分割しました（{len(raw.splitlines())}行 → {len(lines)}行）")
+    except Exception as e:
+        print(f"  スクリプト分割に失敗しました（{e}）。元のまま続行します。")
+
+
 def generate_keywords() -> None:
     """script.txt を読んで OpenAI でキーワードを自動生成し keywords.txt に保存する。"""
     script_path = SCRIPTS_DIR / "script.txt"
@@ -92,25 +161,13 @@ def generate_keywords() -> None:
         print("  script.txt が見つかりません。スキップします。")
         return
 
-    # .env から OPENAI_API_KEY を読む
-    env_path = PROJECT_ROOT / ".env"
-    if env_path.exists():
-        for line in env_path.read_text(encoding="utf-8").splitlines():
-            line = line.strip()
-            if "=" in line and not line.startswith("#"):
-                k, v = line.split("=", 1)
-                os.environ[k.strip()] = v.strip()
-
-    api_key = os.environ.get("OPENAI_API_KEY", "")
-    if not api_key:
+    client = load_openai_client()
+    if client is None:
         print("  OPENAI_API_KEY が見つかりません。keywords.txt の自動生成をスキップします。")
         return
 
     try:
-        import openai
-        client = openai.OpenAI(api_key=api_key)
         script_text = script_path.read_text(encoding="utf-8").strip()
-
         resp = client.chat.completions.create(
             model="gpt-4o-mini",
             messages=[
@@ -128,9 +185,9 @@ def generate_keywords() -> None:
             temperature=0.3,
         )
         keywords = [
-            line.strip()
-            for line in resp.choices[0].message.content.splitlines()
-            if line.strip()
+            l.strip().lstrip("-・・ ").strip()
+            for l in resp.choices[0].message.content.splitlines()
+            if l.strip()
         ]
         keywords_path.write_text("\n".join(keywords) + "\n", encoding="utf-8")
         print(f"  keywords.txt を自動生成しました（{len(keywords)}件）: {', '.join(keywords)}")
@@ -162,6 +219,10 @@ def main():
     print(f"\n{'='*50}")
     print("【Step 0.5】input/ から素材をコピー中...")
     copy_inputs()
+
+    print(f"\n{'='*50}")
+    print("【Step 0.7】スクリプトを字幕行に分割中...")
+    segment_script()
 
     run_script("transcribe_words.py")
 

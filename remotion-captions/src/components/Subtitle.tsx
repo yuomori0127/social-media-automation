@@ -155,7 +155,7 @@ interface SubtitlePageProps {
 export const SubtitlePage: React.FC<SubtitlePageProps> = ({ text, animate }) => {
   const frame = useCurrentFrame();
   const { fps, width, height } = useVideoConfig();
-  const fontSize = calcFontSize(text, width);
+  const fontSize = BASE_FONT_SIZE;
 
   let opacity = 1;
   let translateY = 0;
@@ -190,9 +190,11 @@ export const SubtitlePage: React.FC<SubtitlePageProps> = ({ text, animate }) => 
           fontFamily: "'Noto Sans JP', sans-serif",
           fontWeight: 900,
           color: "#FFFFFF",
-          whiteSpace: "nowrap",
+          whiteSpace: "pre-wrap",
+          textAlign: "center",
+          maxWidth: width * MAX_WIDTH_RATIO,
           textShadow: makeOutlineShadow("#FF0000", 8),
-          lineHeight: 1,
+          lineHeight: 1.35,
         }}
       >
         {renderTaggedText(text)}
