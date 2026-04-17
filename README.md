@@ -101,12 +101,12 @@ python generate_banner.py --title "タイトル" --output "./images/banners/YYYY
 
 #### Step 1：素材を用意する
 
-以下の2ファイルだけ用意すれば OK。他は自動生成される。
+以下の2ファイルを `input/` フォルダに置くだけ。他は自動生成される。
 
 | ファイル | 内容 |
 |---|---|
-| `remotion-captions/public/video.mp4` | テロップを乗せたい動画（上書きコピー） |
-| `remotion-captions/scripts/script.txt` | 台本テキスト |
+| `remotion-captions/input/video.mp4` | テロップを乗せたい動画 |
+| `remotion-captions/input/script.txt` | 台本テキスト |
 
 **script.txt の書き方：**
 - 1行 = テロップ1枚として表示される
@@ -134,6 +134,7 @@ python scripts/run_all.py
 | ステップ | 処理 |
 |---|---|
 | Step 0 | 前回の成果物を `sessions/YYYYMMDD_HHMMSS/` に自動バックアップ |
+| Step 0.5 | `input/video.mp4` → `public/`、`input/script.txt` → `scripts/` にコピー |
 | Step 1 | ffmpegで音声抽出 → Whisper APIで単語レベルのタイムスタンプ取得 |
 | Step 1.5 | script.txt からキーワードをAI自動生成 → `keywords.txt` に保存 |
 | Step 2 | 台本とWhisperを照合 → `src/data/captions.ts` を生成 |
@@ -198,10 +199,13 @@ remotion-captions/sessions/
 
 ```
 remotion-captions/
+├── input/
+│   ├── video.mp4               ← 毎回ここに置く
+│   └── script.txt              ← 毎回ここに置く
 ├── public/
-│   └── video.mp4               ← 毎回上書き
+│   └── video.mp4               ← 自動コピー（Remotion用）
 ├── scripts/
-│   ├── script.txt              ← 毎回書き換える
+│   ├── script.txt              ← 自動コピー
 │   ├── keywords.txt            ← 自動生成
 │   ├── run_all.py              ← 一括実行スクリプト
 │   ├── transcribe_words.py     ← Whisper実行

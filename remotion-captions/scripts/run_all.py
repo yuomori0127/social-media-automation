@@ -1,17 +1,13 @@
 """
 テロップ生成パイプライン（バックアップ付き一括実行）
 
+【使い方】
+  1. input/video.mp4   に素材動画を置く
+  2. input/script.txt  に台本テキストを置く
+  3. python scripts/run_all.py を実行する
+
 実行するたびに前回の成果物を sessions/YYYYMMDD_HHMMSS/ に退避してから
 transcribe_words.py → script_align.py を順番に実行する。
-
-バックアップ対象:
-  public/video.mp4                ← 素材動画
-  scripts/audio.wav               ← 抽出済み音声
-  scripts/script.txt              ← 台本
-  scripts/keywords.txt            ← ハイライトキーワード
-  scripts/whisper_words_raw.json  ← Whisper生データ
-  src/data/captions.ts            ← 生成済みキャプション
-  output/                         ← レンダリング済みMP4（あれば）
 
 Usage:
     python scripts/run_all.py
@@ -27,6 +23,7 @@ from pathlib import Path
 PROJECT_ROOT = Path(__file__).parent.parent
 SCRIPTS_DIR = PROJECT_ROOT / "scripts"
 SESSIONS_DIR = PROJECT_ROOT / "sessions"
+INPUT_DIR = PROJECT_ROOT / "input"
 
 # 単体ファイルのバックアップ対象
 BACKUP_FILES = [
@@ -68,6 +65,22 @@ def backup_previous_run() -> Path | None:
 
     print(f"バックアップ完了: sessions/{session_dir.name}/")
     return session_dir
+
+
+def copy_inputs() -> None:
+    """input/ の素材を各処理スクリプトが期待する場所にコピーする。"""
+    mapping = {
+        INPUT_DIR / "video.mp4":   PROJECT_ROOT / "public" / "video.mp4",
+        INPUT_DIR / "script.txt":  SCRIPTS_DIR / "script.txt",
+    }
+    for src, dst in mapping.items():
+        if not src.exists():
+            print(f"  警告: {src.relative_to(PROJECT_ROOT)} が見つかりません。スキップします。")
+            continue
+        dst.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(src, dst)
+        size_mb = src.stat().st_size / 1024 / 1024
+        print(f"  コピー: {src.relative_to(PROJECT_ROOT)} → {dst.relative_to(PROJECT_ROOT)} ({size_mb:.1f}MB)")
 
 
 def generate_keywords() -> None:
@@ -145,6 +158,10 @@ def main():
 
     print("【Step 0】前回の成果物をバックアップ中...")
     session_dir = backup_previous_run()
+
+    print(f"\n{'='*50}")
+    print("【Step 0.5】input/ から素材をコピー中...")
+    copy_inputs()
 
     run_script("transcribe_words.py")
 
