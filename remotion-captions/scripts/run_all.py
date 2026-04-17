@@ -4,6 +4,15 @@
 実行するたびに前回の成果物を sessions/YYYYMMDD_HHMMSS/ に退避してから
 transcribe_words.py → script_align.py を順番に実行する。
 
+バックアップ対象:
+  public/video.mp4                ← 素材動画
+  scripts/audio.wav               ← 抽出済み音声
+  scripts/script.txt              ← 台本
+  scripts/keywords.txt            ← ハイライトキーワード
+  scripts/whisper_words_raw.json  ← Whisper生データ
+  src/data/captions.ts            ← 生成済みキャプション
+  output/                         ← レンダリング済みMP4（あれば）
+
 Usage:
     python scripts/run_all.py
 """
@@ -17,29 +26,45 @@ PROJECT_ROOT = Path(__file__).parent.parent
 SCRIPTS_DIR = PROJECT_ROOT / "scripts"
 SESSIONS_DIR = PROJECT_ROOT / "sessions"
 
-BACKUP_TARGETS = [
+# 単体ファイルのバックアップ対象
+BACKUP_FILES = [
+    PROJECT_ROOT / "public" / "video.mp4",
+    SCRIPTS_DIR / "audio.wav",
     SCRIPTS_DIR / "script.txt",
     SCRIPTS_DIR / "keywords.txt",
     SCRIPTS_DIR / "whisper_words_raw.json",
     PROJECT_ROOT / "src" / "data" / "captions.ts",
 ]
 
+# フォルダごとバックアップする対象（中身が存在する場合のみ）
+BACKUP_DIRS = [
+    PROJECT_ROOT / "output",
+]
+
 
 def backup_previous_run() -> Path | None:
-    existing = [p for p in BACKUP_TARGETS if p.exists()]
-    if not existing:
+    existing_files = [p for p in BACKUP_FILES if p.exists()]
+    existing_dirs = [p for p in BACKUP_DIRS if p.exists() and any(p.iterdir())]
+
+    if not existing_files and not existing_dirs:
         print("バックアップ対象ファイルが見つかりません。初回実行としてスキップします。")
         return None
 
     session_dir = SESSIONS_DIR / datetime.now().strftime("%Y%m%d_%H%M%S")
     session_dir.mkdir(parents=True, exist_ok=True)
 
-    for src in existing:
+    for src in existing_files:
         dst = session_dir / src.name
         shutil.copy2(src, dst)
-        print(f"  バックアップ: {src.name} → sessions/{session_dir.name}/")
+        size_mb = src.stat().st_size / 1024 / 1024
+        print(f"  バックアップ: {src.name} ({size_mb:.1f}MB) → sessions/{session_dir.name}/")
 
-    print(f"バックアップ完了: {session_dir}")
+    for src_dir in existing_dirs:
+        dst_dir = session_dir / src_dir.name
+        shutil.copytree(src_dir, dst_dir)
+        print(f"  バックアップ: {src_dir.name}/ → sessions/{session_dir.name}/{src_dir.name}/")
+
+    print(f"バックアップ完了: sessions/{session_dir.name}/")
     return session_dir
 
 
@@ -69,7 +94,7 @@ def main():
     print(f"\n{'='*50}")
     print("=== 完了 ===")
     if session_dir:
-        print(f"前回のデータ: {session_dir}")
+        print(f"前回のデータ: sessions/{session_dir.name}/")
     print("次のステップ: npx remotion studio でプレビューを確認してください。")
 
 

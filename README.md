@@ -180,12 +180,17 @@ Remotion Studioが起動中であればブラウザが自動更新される。
 
 ```
 remotion-captions/sessions/
-└── 20260417_143022/     ← 実行日時
-    ├── script.txt
-    ├── keywords.txt
-    ├── whisper_words_raw.json
-    └── captions.ts
+└── 20260417_143022/          ← 実行日時
+    ├── video.mp4             ← 素材動画
+    ├── audio.wav             ← 抽出済み音声
+    ├── script.txt            ← 台本
+    ├── keywords.txt          ← ハイライトキーワード
+    ├── whisper_words_raw.json ← Whisper生データ
+    ├── captions.ts           ← 生成済みキャプション
+    └── output/               ← レンダリング済みMP4（あれば）
 ```
+
+過去のセッションのファイルをそのまま `public/`・`scripts/`・`src/data/` に戻せば、その回の状態を再現できる。
 
 #### Step 4：プレビューで確認
 
