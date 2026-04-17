@@ -63,7 +63,7 @@ function renderTaggedText(
     parts.push(
       <span
         key={match.index}
-        style={{ color: highlightColor, textShadow: makeOutlineShadow("#000000", 4) }}
+        style={{ color: highlightColor, textShadow: makeOutlineShadow("#000000", 7) }}
       >
         {match[1]}
       </span>
@@ -133,7 +133,7 @@ export const HookBlock: React.FC<HookBlockProps> = ({ lines }) => {
                 fontWeight: 900,
                 color: "#FFFFFF",
                 whiteSpace: "nowrap",
-                textShadow: makeOutlineShadow("#880000", 3),
+                textShadow: makeOutlineShadow("#880000", 7),
                 lineHeight: 1,
               }}
             >
@@ -191,7 +191,7 @@ export const SubtitlePage: React.FC<SubtitlePageProps> = ({ text, animate }) => 
           fontWeight: 900,
           color: "#FFFFFF",
           whiteSpace: "nowrap",
-          textShadow: makeOutlineShadow("#FF0000", 5),
+          textShadow: makeOutlineShadow("#FF0000", 8),
           lineHeight: 1,
         }}
       >
