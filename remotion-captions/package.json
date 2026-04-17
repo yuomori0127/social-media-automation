@@ -1,0 +1,28 @@
+{
+  "name": "remotion-captions",
+  "version": "1.0.0",
+  "description": "Remotion caption video",
+  "type": "module",
+  "scripts": {
+    "start": "npx remotion studio",
+    "build": "npx remotion render",
+    "tsc": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@remotion/captions": "^4.0.0",
+    "@remotion/cli": "^4.0.448",
+    "mediabunny": "^1.39.2",
+    "openai": "^4.0.0",
+    "react": "^18.0.0",
+    "react-dom": "^18.0.0",
+    "remotion": "^4.0.0",
+    "zod": "4.3.6"
+  },
+  "devDependencies": {
+    "@types/node": "^25.6.0",
+    "@types/react": "^18.0.0",
+    "@types/react-dom": "^18.0.0",
+    "ffmpeg-static": "^5.2.0",
+    "typescript": "^5.0.0"
+  }
+}

@@ -1,0 +1,150 @@
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Remotion 自動テロップ生成プロンプト（Claude Code用）
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+参考元: https://x.com/wancoro_xx/status/2042801142670004471
+
+【使い方】
+1. Claude Code を起動
+2. 以下のプロンプトをコピペしてEnter
+3. 動画ファイルのパスと台本テキストを聞かれるので入力
+4. 自動処理が完了するまで待つ
+
+【事前セットアップ（初回のみ）】
+- Remotion スキルのインストール:
+  npx skills add remotion-dev/skills
+  （途中の選択肢はすべてYesでEnter）
+
+- OpenAI APIキーの取得:
+  https://platform.openai.com/ でアカウント作成
+  → API keys → Create new secret key → コピーして保存
+  ※Whisper APIは1分あたり約0.9円。5ドルで動画数十本分。
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+【プロンプト本文（ここから下をClaude Codeにコピペ）】
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+---
+  あなたは超優秀なフルスタックエンジニアであり、
+  Remotionを用いた動画テロップ実装のスペシャリストです。
+  以下を最初から最後まで自動で実行してください。
+  途中でユーザーの入力を待つ場合以外は止まらずに完了させること。
+
+  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  【絶対厳守のUI/UX仕様】
+  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  1. 動画の上にはテロップのみ。説明パネル・サイドバー等の
+     装飾コンポーネントは一切実装・表示しないこと。
+
+  2. テロップは「絶対に1行」。
+     - whiteSpace: "nowrap" で折り返し禁止を強制すること。
+     - テキスト幅を文字種別（全角≒fontSize×0.92、
+       半角≒fontSize×0.55）で推定し、
+       動画幅の94%に収まるようfontSizeを自動スケールダウンする
+       関数 calcFontSize(text, videoWidth) を必ず実装すること。
+     - 基準フォントサイズは68px、最小は34px。
+
+  3. テロップ位置は「paddingBottom = height * 0.08」で
+     画面下部8%に固定。
+
+  4. デザイン仕様：
+     - 白文字 (#FFFFFF)、フォント: Noto Sans JP weight:900
+     - 白文字の縁取り：「8方向 5px text-shadow」赤 (#FF0000)。
+       実装: [-5, 0, 5] × [-5, 0, 5] の組み合わせ
+       （0,0を除く8方向）それぞれ `Xpx Ypx 0 #FF0000`
+     - 重要キーワードは color: "#FFFF00" でハイライト。
+       キーワードの縁取り：「8方向 5px text-shadow」黒 (#000000)。
+       キーワードは長いものから順にマッチさせ二重タグを防ぐこと。
+
+  5. テロップ出現アニメーション：
+     spring(damping:20, stiffness:160, mass:0.65) で
+     translateY 28→0px かつ opacity 0→1 のフェードイン。
+     durationInFrames: Math.round(fps * 0.28)
+     ※ ただし startFrame === 0 の最初のテロップのみ
+       アニメーションをスキップし、opacity=1・translateY=0 で即表示。
+
+  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  【手順1】動画の配置
+  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  PC内（Downloadsフォルダ等）から対象動画を検索し、
+  Remotionプロジェクトの public/video.mp4 に配置すること。
+  既存のRemotionプロジェクトがあれば再利用する。
+
+  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  【手順2】ユーザー入力
+  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  以下を確認・取得すること：
+  A) OpenAI APIキー → .env の OPENAI_API_KEY に保存
+  B) 台本テキスト（改行区切り） →
+     「改行1行 = テロップ1枚」として扱う
+
+  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  【手順3】音声抽出 → Whisper word-level 取得
+  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  1. ffmpegで video.mp4 から audio.wav を抽出。
+  2. Whisper API (whisper-1) を以下パラメータで呼び出す
+     Node.jsスクリプト scripts/transcribe_words.mjs を作成・実行：
+     - response_format: "verbose_json"
+     - timestamp_granularities[]: "word"
+     - language: "ja"
+     - prompt: 台本テキスト（表記揺れ防止）
+     結果を scripts/whisper_words_raw.json に保存。
+
+  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  【手順4】台本ベースのタイムスタンプアライメント
+  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  scripts/script_align.mjs を作成・実行：
+
+  アルゴリズム（必ずこの方式で実装）：
+  1. Whisper の words[] から句読点・記号を除去した
+     「正規化文字ストリーム」を構築し、
+     各文字に対してその単語の秒数を線形補間で割り当てる。
+  2. 台本全行を連結した正規化文字列の長さを基準に、
+     各行の先頭文字位置を Whisper ストリームに比例マッピング：
+     whisperIdx = round(scriptCharPos / totalScriptNormLen
+                         * totalWhisperNormLen)
+  3. 各行の startTime = マップ先の whisper 文字の秒数、
+     endTime = 次行の startTime（最終行のみ
+     words[lastIdx].end を使用して無音末尾をカット）。
+  4. キーワードに <b>タグ</b> を付けて src/data/captions.ts に出力。
+     型は @remotion/captions の Caption[]。
+     各オブジェクトに timestampMs: startMs, confidence: 1 も必須。
+
+  正規化関数の除去対象：
+  句読点全般 (。、！？・…×「」『』【】（）,.!?) + 空白・記号
+
+  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  【手順5】Remotionコンポーネント実装
+  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  src/components/Subtitle.tsx：
+  - 上記【絶対厳守のUI/UX仕様】を完全に満たすこと。
+  - useVideoConfig() から width / height / fps を取得し、
+    全てのサイズ計算に使用すること。
+  - SubtitlePage は animate: boolean プロップを受け取り、
+    false のときは即表示（opacity=1, translateY=0）。
+  - SubtitleLayer では startFrame === 0 のとき animate={false} を渡す。
+
+  src/[VideoName].tsx：
+  - <Video src={staticFile("video.mp4")} /> と
+    <SubtitleLayer> のみで構成。装飾コンポーネント不可。
+
+  src/Root.tsx の calculateMetadata：
+  - mediabunny で動画の実サイズ・fps を取得。
+  - CAPTIONS をインポートし、
+    durationInFrames = Math.ceil(
+      Math.min(videoDuration, lastCaption.endMs/1000 + 0.05) * fps
+    ) で、最終セリフ終了時に動画を終了させること。
+
+  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  【手順6】完了
+  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  npx tsc --noEmit でエラーがないことを確認してから
+  npm start でプレビューを起動し、完了を報告すること。
+
+  ---
+  主な設定値：
+  - フォントサイズ: 68px（最小34px）
+  - 白文字フチ: 赤(#FF0000) 5px
+  - キーワード色: #FFFF00
+  - キーワードフチ: 黒(#000000) 5px
+  - Caption型に timestampMs と confidence: 1 を必須化
+  - 最初のテロップ(startFrame===0)のアニメーションスキップ

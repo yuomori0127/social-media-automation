@@ -1,0 +1,50 @@
+# ===== 機密情報 =====
+.env
+.env.*
+.claude/settings.local.json
+token.json
+**/.mcp-google-sheets-token.json
+
+# ===== Claude Code エージェント設定（パス・ID含む） =====
+.claude/
+
+# ===== 依存パッケージ =====
+node_modules/
+remotion-captions/node_modules/
+
+# ===== 生成・中間ファイル =====
+logs/
+row_content/
+content_batch.json
+remotion-captions/scripts/audio.wav
+remotion-captions/scripts/whisper_words_raw.json
+
+# ===== 動画・音声（容量大） =====
+short_movie/
+voice/
+remotion-captions/public/video.mp4
+images/
+
+# ===== 使い捨てスクリプト（行番号・日付入り） =====
+write_row*.mjs
+write_batch_*.mjs
+fix_backtick*.py
+add_dental_papers.mjs
+
+# ===== Officeドキュメント =====
+*.docx
+*.xlsx
+*.pptx
+*.docx.bak*
+
+# ===== ビルド成果物 =====
+dist/
+output/
+__pycache__/
+*.pyc
+
+# ===== OS・エディタ生成ファイル =====
+.DS_Store
+Thumbs.db
+*.stackdump
+~$*

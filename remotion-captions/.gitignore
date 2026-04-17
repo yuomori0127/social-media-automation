@@ -1,0 +1,16 @@
+# 機密情報
+.env
+
+# 動画・音声（容量大・毎回差し替えるもの）
+public/video.mp4
+scripts/audio.wav
+
+# Whisper中間ファイル（再生成可能）
+scripts/whisper_words_raw.json
+
+# 依存パッケージ
+node_modules/
+
+# ビルド成果物
+dist/
+output/
