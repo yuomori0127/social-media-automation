@@ -152,8 +152,10 @@ npx remotion studio
 #### Step 4：MP4を書き出す
 
 ```bash
-npx remotion render CaptionVideo output/video_with_captions.mp4
+python render.py
 ```
+
+`out/YYYYMMDD.mp4` に保存される。
 
 ### タイミングの手動調整
 
