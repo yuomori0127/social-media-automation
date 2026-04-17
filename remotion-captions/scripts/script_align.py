@@ -1,56 +1,55 @@
 """
 台本ベースのタイムスタンプアライメント → src/data/captions.ts 出力
-台本は scripts/script.txt から読み込みます（1行 = テロップ1枚）。
 
-キーワードのハイライトは scripts/keywords.txt に記載します（1行 = 1キーワード）。
-keywords.txt が存在しない場合はハイライトなしで出力します。
+アルゴリズム:
+  1. Whisper単語を正規化文字ストリームに展開（文字ごとのタイムスタンプ）
+  2. 各台本行の冒頭・中間・後半をWhisperテキストから順番に検索
+     （前の行の終了位置より後ろだけを対象にする）
+  3. 見つかった位置のタイムスタンプを開始時刻として使用
+  4. Whisperに存在しない行（冒頭が多い）は 0ms を割り当てる
+
+キーワードのハイライトは scripts/keywords.txt に記載（1行 = 1キーワード）。
 """
-import io
 import json
 import re
 import sys
 from pathlib import Path
 
-# Windows コンソールの cp932 制限を回避
-if hasattr(sys.stdout, "reconfigure"):
-    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
-
 PROJECT_ROOT = Path(__file__).parent.parent
 SCRIPTS_DIR = PROJECT_ROOT / "scripts"
+
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 
 # --- 台本読み込み ---
 script_path = SCRIPTS_DIR / "script.txt"
 if not script_path.exists():
     print(f"Error: {script_path} が見つかりません", file=sys.stderr)
     sys.exit(1)
-SCRIPT_LINES = [
-    line for line in script_path.read_text(encoding="utf-8").splitlines()
-    if line.strip()
-]
+SCRIPT_LINES = [l for l in script_path.read_text(encoding="utf-8").splitlines() if l.strip()]
 print(f"台本を読み込みました（{len(SCRIPT_LINES)}行）")
 
 # --- キーワード読み込み（任意） ---
 keywords_path = SCRIPTS_DIR / "keywords.txt"
 if keywords_path.exists():
-    KEYWORDS = [
-        line.strip() for line in keywords_path.read_text(encoding="utf-8").splitlines()
-        if line.strip()
-    ]
-    # 長い順にソート（二重タグ防止）
-    KEYWORDS = sorted(KEYWORDS, key=len, reverse=True)
+    KEYWORDS = sorted(
+        [l.strip() for l in keywords_path.read_text(encoding="utf-8").splitlines() if l.strip()],
+        key=len, reverse=True,
+    )
     print(f"キーワードを読み込みました（{len(KEYWORDS)}件）")
 else:
     KEYWORDS = []
     print("keywords.txt が見つかりません。ハイライトなしで出力します。")
 
-# --- 正規化 ---
-STRIP_PATTERN = re.compile(r'[。、！？・…×「」『』【】（）,.!?\s\-\uff0d\u30fc——]')
+# --- 正規化（句読点・記号・空白を除去） ---
+STRIP_PATTERN = re.compile(
+    r'[。、！？・…×「」『』【】（）(),.!?\s\-\uff0d\u30fc——\u300c\u300d\u3010\u3011]'
+)
 
 def normalize(text: str) -> str:
     return STRIP_PATTERN.sub("", text)
 
 def add_keyword_tags(text: str) -> str:
-    """キーワードに <b> タグ付け（長い順・二重タグ防止）"""
     if not KEYWORDS:
         return text
     result = text
@@ -62,6 +61,45 @@ def add_keyword_tags(text: str) -> str:
     for ph, tagged in placeholders.items():
         result = result.replace(ph, tagged)
     return result
+
+
+def build_whisper_char_stream(words: list) -> tuple:
+    """Whisper単語リスト → [(start_time, char), ...] と正規化済み文字列"""
+    chars = []
+    for w in words:
+        word_text = normalize(w["word"])
+        if not word_text:
+            continue
+        start, end, n = w["start"], w["end"], len(word_text)
+        for i, ch in enumerate(word_text):
+            chars.append((start + (end - start) * i / n, ch))
+    return chars, "".join(c for _, c in chars)
+
+
+# 短い文字列は誤マッチが多いため、この長さ未満の検索は行わない
+MIN_MATCH_LEN = 6
+
+
+def search_line(norm_line: str, whisper_str: str, whisper_chars: list, from_pos: int):
+    """
+    norm_line の冒頭・1/4・1/2の3箇所からサブ文字列を取り出し、
+    whisper_str の from_pos 以降で検索する。
+    見つかれば (start_time, next_from_pos)、見つからなければ (None, from_pos) を返す。
+    """
+    n = len(norm_line)
+    for offset in [0, n // 4, n // 2]:
+        remaining = n - offset
+        if remaining < MIN_MATCH_LEN:
+            continue
+        for length in range(min(12, remaining), MIN_MATCH_LEN - 1, -1):
+            window = norm_line[offset:offset + length]
+            idx = whisper_str.find(window, from_pos)
+            if idx != -1:
+                # マッチ位置から offset 文字前が行の推定開始位置（from_pos を下回らない）
+                est_start_idx = max(from_pos, idx - offset)
+                return whisper_chars[est_start_idx][0], idx + len(window)
+    return None, from_pos
+
 
 def main():
     raw_path = SCRIPTS_DIR / "whisper_words_raw.json"
@@ -77,44 +115,28 @@ def main():
         print("Error: words が空です", file=sys.stderr)
         sys.exit(1)
 
-    # --- 正規化文字ストリーム構築 ---
-    whisper_chars = []
-    for w in words:
-        word_text = normalize(w["word"])
-        if not word_text:
-            continue
-        start, end, n = w["start"], w["end"], len(word_text)
-        for i, ch in enumerate(word_text):
-            whisper_chars.append((start + (end - start) * i / n, ch))
+    whisper_chars, whisper_str = build_whisper_char_stream(words)
+    print(f"Whisper文字数（正規化後）: {len(whisper_str)}")
 
-    total_whisper_norm_len = len(whisper_chars)
+    # --- 各台本行を順番に検索 ---
+    search_pos = 0
+    line_start_times: list = []
 
-    # --- 台本の正規化と先頭位置計算 ---
-    script_norm_lines = [normalize(line) for line in SCRIPT_LINES]
-    total_script_norm_len = len("".join(script_norm_lines))
+    for line in SCRIPT_LINES:
+        norm = normalize(line)
+        t, search_pos = search_line(norm, whisper_str, whisper_chars, search_pos)
+        line_start_times.append(t)
 
-    line_start_positions = []
-    pos = 0
-    for norm_line in script_norm_lines:
-        line_start_positions.append(pos)
-        pos += len(norm_line)
+    # --- Whisperに存在しない行を補間 ---
+    # None の行は前後の時刻から推定（冒頭の行は 0ms）
+    for i in range(len(line_start_times)):
+        if line_start_times[i] is None:
+            line_start_times[i] = 0.0
 
-    def script_pos_to_time(char_pos: int) -> float:
-        if total_script_norm_len == 0:
-            return 0.0
-        idx = round(char_pos / total_script_norm_len * total_whisper_norm_len)
-        idx = max(0, min(idx, total_whisper_norm_len - 1))
-        return whisper_chars[idx][0]
-
-    # --- アライメント実行 ---
+    # --- キャプション生成 ---
     captions = []
-    for i, (line, line_pos) in enumerate(zip(SCRIPT_LINES, line_start_positions)):
-        start_time = script_pos_to_time(line_pos)
-        end_time = (
-            script_pos_to_time(line_start_positions[i + 1])
-            if i + 1 < len(SCRIPT_LINES)
-            else words[-1]["end"]
-        )
+    for i, (line, start_time) in enumerate(zip(SCRIPT_LINES, line_start_times)):
+        end_time = line_start_times[i + 1] if i + 1 < len(line_start_times) else words[-1]["end"]
         start_ms = round(start_time * 1000)
         end_ms = round(end_time * 1000)
         tagged_text = add_keyword_tags(line)
@@ -125,7 +147,8 @@ def main():
             "timestampMs": start_ms,
             "confidence": 1,
         })
-        print(f"[{i+1}] {start_ms}ms - {end_ms}ms: {line[:40]}")
+        status = "✓" if start_time > 0 else "⚠0ms推定"
+        print(f"[{i+1}] {start_ms}ms - {end_ms}ms {status}: {line[:45]}")
 
     # --- captions.ts 出力 ---
     out_path = PROJECT_ROOT / "src" / "data" / "captions.ts"
@@ -150,6 +173,7 @@ def main():
 
     out_path.write_text("\n".join(ts_lines), encoding="utf-8")
     print(f"\ncaptions.ts を出力しました: {out_path}")
+
 
 if __name__ == "__main__":
     main()

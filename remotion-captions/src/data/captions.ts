@@ -1,50 +1,46 @@
 import type { Caption } from "@remotion/captions";
 
-// このファイルは python scripts/script_align.py で自動生成されます
-// OpenAI Whisper API のクォータを回復したあと以下の手順を実行:
-//   1. python scripts/transcribe_words.py
-//   2. python scripts/script_align.py
 export const CAPTIONS: Caption[] = [
   {
-    text: "「慣らし保育がつらいとき、<b>父親</b>にできることって何？」",
+    text: "「<b>慣らし保育</b>がつらいとき、<b>父親</b>にできることって何？」",
     startMs: 0,
-    endMs: 5000,
+    endMs: 3700,
     timestampMs: 0,
     confidence: 1,
   },
   {
     text: "<b>分離不安</b>や<b>慣らし保育</b>の話は、なぜか「母と子」の話が中心になりがち。",
-    startMs: 5000,
-    endMs: 10000,
-    timestampMs: 5000,
+    startMs: 3700,
+    endMs: 9120,
+    timestampMs: 3700,
     confidence: 1,
   },
   {
-    text: "でも、<b>父親との愛着形成</b>も子どもの発達に関わっているという<b>論文</b>がある。",
-    startMs: 10000,
-    endMs: 16000,
-    timestampMs: 10000,
+    text: "でも、<b>父親との愛着形成</b>も子どもの発達に関わっているという研究がある。",
+    startMs: 9120,
+    endMs: 13740,
+    timestampMs: 9120,
     confidence: 1,
   },
   {
-    text: "母親との愛着が「<b>安心して戻れる場所</b>」として機能しやすいのに対し、",
-    startMs: 16000,
-    endMs: 22000,
-    timestampMs: 16000,
+    text: "母親との愛着が「<b>安心して戻れる場所</b>」として機能しやすいのに対し、<b>父親</b>との関係は「<b>外の世界に向かう力</b>」に関わりやすいという指摘がある。",
+    startMs: 13740,
+    endMs: 22420,
+    timestampMs: 13740,
     confidence: 1,
   },
   {
-    text: "<b>足腰を作っている</b>のかもしれない。",
-    startMs: 22000,
-    endMs: 28000,
-    timestampMs: 22000,
+    text: "帰宅後に思い切り遊ぶ、新しい場所に連れて行く——そういう関わりが、毎朝保育園に向かっていく<b>足腰を作っている</b>のかもしれない。",
+    startMs: 22420,
+    endMs: 30087,
+    timestampMs: 22420,
     confidence: 1,
   },
   {
     text: "詳しくは<b>note</b>で。フォローで続報も届けます。",
-    startMs: 28000,
-    endMs: 35200,
-    timestampMs: 28000,
+    startMs: 30087,
+    endMs: 33900,
+    timestampMs: 30087,
     confidence: 1,
   },
 ];
