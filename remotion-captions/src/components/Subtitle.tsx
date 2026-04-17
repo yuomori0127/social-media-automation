@@ -2,7 +2,7 @@ import React from "react";
 import { interpolate, spring, useCurrentFrame, useVideoConfig } from "remotion";
 
 // ── フォントサイズ自動スケール ──────────────────────────────────────
-const BASE_FONT_SIZE = 68;
+const BASE_FONT_SIZE = 80;
 const MIN_FONT_SIZE = 34;
 const MAX_WIDTH_RATIO = 0.94;
 

@@ -128,10 +128,31 @@ def main():
         line_start_times.append(t)
 
     # --- Whisperに存在しない行を補間 ---
-    # None の行は前後の時刻から推定（冒頭の行は 0ms）
-    for i in range(len(line_start_times)):
+    # 冒頭のNone群: 0ms から最初に見つかった時刻まで等分
+    # 中間のNone群: 前後の見つかった時刻の間を等分
+    # 末尾のNone群: 最後に見つかった時刻から最終単語終了時刻まで等分
+    last_ms = words[-1]["end"] * 1000
+    n_lines = len(line_start_times)
+    i = 0
+    while i < n_lines:
         if line_start_times[i] is None:
-            line_start_times[i] = 0.0
+            j = i
+            while j < n_lines and line_start_times[j] is None:
+                j += 1
+            count = j - i
+            left_t = (line_start_times[i - 1] * 1000) if i > 0 else 0.0
+            right_t = (line_start_times[j] * 1000) if j < n_lines else last_ms
+            if i == 0:
+                # 冒頭: 0ms スタートで等分
+                for k in range(count):
+                    line_start_times[i + k] = right_t * k / count / 1000
+            else:
+                # 中間・末尾: 前後の間を等分
+                for k in range(count):
+                    line_start_times[i + k] = (left_t + (right_t - left_t) * (k + 1) / (count + 1)) / 1000
+            i = j
+        else:
+            i += 1
 
     # --- キャプション生成 ---
     captions = []
