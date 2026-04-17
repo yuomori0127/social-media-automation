@@ -42,11 +42,13 @@ if not ffmpeg_bin:
         print("Error: ffmpeg が見つかりません", file=sys.stderr)
         sys.exit(1)
 
-print(f"音声を抽出中...")
+print(f"音声を抽出中（声の周波数帯を強調）...")
 result = subprocess.run([
     ffmpeg_bin, "-y",
     "-i", str(video_path),
-    "-vn", "-acodec", "pcm_s16le", "-ar", "16000", "-ac", "1",
+    "-vn",
+    "-af", "highpass=f=200,lowpass=f=3000,volume=2.0",
+    "-acodec", "pcm_s16le", "-ar", "16000", "-ac", "1",
     str(audio_path),
 ], capture_output=True)
 if result.returncode != 0:
@@ -58,6 +60,9 @@ print(f"音声抽出完了: {audio_path}")
 import openai
 client = openai.OpenAI(api_key=os.environ["OPENAI_API_KEY"])
 
+# prompt は台本の冒頭1行だけに絞る（全文渡すと混乱する）
+prompt_hint = SCRIPT_TEXT.splitlines()[0] if SCRIPT_TEXT else ""
+
 print("Whisper APIを呼び出し中...")
 with open(audio_path, "rb") as f:
     transcription = client.audio.transcriptions.create(
@@ -66,7 +71,7 @@ with open(audio_path, "rb") as f:
         response_format="verbose_json",
         timestamp_granularities=["word"],
         language="ja",
-        prompt=SCRIPT_TEXT,
+        prompt=prompt_hint,
     )
 
 data = transcription.model_dump()
