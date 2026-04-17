@@ -5,10 +5,15 @@
 キーワードのハイライトは scripts/keywords.txt に記載します（1行 = 1キーワード）。
 keywords.txt が存在しない場合はハイライトなしで出力します。
 """
+import io
 import json
 import re
 import sys
 from pathlib import Path
+
+# Windows コンソールの cp932 制限を回避
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 
 PROJECT_ROOT = Path(__file__).parent.parent
 SCRIPTS_DIR = PROJECT_ROOT / "scripts"

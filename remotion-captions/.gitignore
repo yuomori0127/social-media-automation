@@ -14,3 +14,6 @@ node_modules/
 # ビルド成果物
 dist/
 output/
+
+# 過去セッションのバックアップ（ローカル保管）
+sessions/

@@ -160,20 +160,32 @@ Remotionは「ReactコードでHTMLを動画に変換する」フレームワー
 詳しくはnoteで。フォローで続報も届けます。
 ```
 
-#### Step 2：音声文字起こし（Whisper API）
+#### Step 2：文字起こし＋タイムスタンプ生成（一括実行）
 
 ```bash
 cd remotion-captions
-python scripts/transcribe_words.py
+python scripts/run_all.py
 ```
 
-#### Step 3：タイムスタンプ生成
+実行前に前回の成果物を `sessions/YYYYMMDD_HHMMSS/` へ自動バックアップしてから、以下を順番に実行する。
 
-```bash
-python scripts/script_align.py
+1. `transcribe_words.py` — ffmpegで音声抽出 → Whisper APIで単語レベルのタイムスタンプ取得
+2. `script_align.py` — 台本と照合して `src/data/captions.ts` を生成
+
+Remotion Studioが起動中であればブラウザが自動更新される。
+
+> 個別実行したい場合は `python scripts/transcribe_words.py` / `python scripts/script_align.py` を直接呼ぶ。
+
+**バックアップの保存先**
+
 ```
-
-`src/data/captions.ts` が自動生成される。Remotion Studioが起動中であれば、ブラウザが自動更新される。
+remotion-captions/sessions/
+└── 20260417_143022/     ← 実行日時
+    ├── script.txt
+    ├── keywords.txt
+    ├── whisper_words_raw.json
+    └── captions.ts
+```
 
 #### Step 4：プレビューで確認
 
